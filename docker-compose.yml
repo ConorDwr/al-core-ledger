@@ -1,0 +1,7 @@
+services:
+  hardhat-node:
+    build: .
+    container_name: al-hardhat-node
+    ports:
+      - "8545:8545"
+    restart: unless-stopped

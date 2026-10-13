@@ -1,0 +1,14 @@
+# Secrets
+serviceAccountKey.json
+.env
+*-firebase-adminsdk-*.json
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Node / Hardhat
+node_modules/
+artifacts/
+cache/

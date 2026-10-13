@@ -1,0 +1,115 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helpers ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return request.auth.token.get('role', null);
+    }
+
+    function isBorrower()    { return signedIn() && role() == 'borrower'; }
+    function isBroker()      { return signedIn() && role() == 'broker'; }
+    function isUnderwriter() { return signedIn() && role() == 'underwriter'; }
+
+    // Fields only the Core API (Admin SDK) may write. Clients can never set these.
+    function protectedFields() {
+      return ['tokenId', 'txHash', 'aiResult', 'valuation', 'decision', 'brokerId'];
+    }
+
+    function applicationData(appId) {
+      return get(/databases/$(database)/documents/applications/$(appId)).data;
+    }
+
+    // Borrower who owns the application, the assigned broker, or any underwriter
+    function isParticipant(appId) {
+      let a = applicationData(appId);
+      return signedIn() && (
+        a.borrowerId == request.auth.uid ||
+        a.get('brokerId', null) == request.auth.uid ||
+        isUnderwriter()
+      );
+    }
+
+    // ---------- users ----------
+    match /users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isUnderwriter());
+      allow create, update: if signedIn()
+        && request.auth.uid == userId
+        && !('role' in request.resource.data);
+      allow delete: if false;
+    }
+
+    // ---------- applications ----------
+    match /applications/{appId} {
+      allow read: if signedIn() && (
+        resource.data.borrowerId == request.auth.uid ||
+        (isBroker() && resource.data.get('brokerId', null) == request.auth.uid) ||
+        isUnderwriter()
+      );
+
+      // Borrowers can create their own application as a draft or submitted
+      allow create: if isBorrower()
+        && request.resource.data.borrowerId == request.auth.uid
+        && request.resource.data.status in ['Draft', 'Applied']
+        && !request.resource.data.keys().hasAny(protectedFields());
+
+      // Borrowers can only edit their own application while it is still a draft.
+      // Every later status change goes through the Core API.
+      allow update: if isBorrower()
+        && resource.data.borrowerId == request.auth.uid
+        && resource.data.status == 'Draft'
+        && request.resource.data.borrowerId == resource.data.borrowerId
+        && request.resource.data.status in ['Draft', 'Applied']
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedFields());
+
+      allow delete: if isBorrower()
+        && resource.data.borrowerId == request.auth.uid
+        && resource.data.status == 'Draft';
+    }
+
+    // ---------- brokerAssignments (written by the Core API only) ----------
+    match /brokerAssignments/{assignmentId} {
+      allow read: if signedIn() && (
+        resource.data.brokerId == request.auth.uid ||
+        resource.data.borrowerId == request.auth.uid ||
+        isUnderwriter()
+      );
+      allow write: if false;
+    }
+
+    // ---------- messages ----------
+    match /messages/{messageId} {
+      allow read: if isParticipant(resource.data.applicationId);
+      allow create: if signedIn()
+        && request.resource.data.senderId == request.auth.uid
+        && isParticipant(request.resource.data.applicationId);
+      allow update, delete: if false;
+    }
+
+    // ---------- documents (metadata only, files live in Storage) ----------
+    match /documents/{documentId} {
+      allow read: if isParticipant(resource.data.applicationId);
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && isParticipant(request.resource.data.applicationId);
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow update: if false;
+    }
+
+    // ---------- auditRecords (written by the Core API only) ----------
+    match /auditRecords/{recordId} {
+      allow read: if isUnderwriter();
+      allow write: if false;
+    }
+
+    // Everything else is denied
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
