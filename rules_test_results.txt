@@ -1,0 +1,29 @@
+Firestore security rules test
+Project: agentic-lender-be30f
+Run: 2026-10-24 18:29
+Accounts: borrower@test.com (borrower), broker@test.com (broker), underwriter@test.com (underwriter)
+
+PASS  TC4.1   Borrower reads their own application                               expected ALLOW got ALLOW (HTTP 200)
+PASS  TC4.2   Borrower reads another borrower's application                      expected DENY  got DENY  (HTTP 403)
+PASS  TC4.2b  Borrower runs an unfiltered query on all applications              expected DENY  got DENY  (HTTP 403)
+PASS  TC4.2c  Borrower queries applications where borrowerId == own uid          expected ALLOW got ALLOW (HTTP 200)
+PASS  TC4.3a  Broker reads an application assigned to them                       expected ALLOW got ALLOW (HTTP 200)
+PASS  TC4.3b  Broker reads an application not assigned to them                   expected DENY  got DENY  (HTTP 403)
+PASS  TC4.4a  Underwriter reads any application (assigned one)                   expected ALLOW got ALLOW (HTTP 200)
+PASS  TC4.4b  Underwriter reads any application (someone else's)                 expected ALLOW got ALLOW (HTTP 200)
+PASS  TC4.5a  Borrower creates an application with status 'Funded'               expected DENY  got DENY  (HTTP 403)
+PASS  TC4.5b  Borrower creates an application containing txHash                  expected DENY  got DENY  (HTTP 403)
+PASS  TC4.5c  Borrower creates a valid Draft application for themselves          expected ALLOW got ALLOW (HTTP 200)
+PASS  TC4.5d  Borrower updates loanAmount on their own Draft                     expected ALLOW got ALLOW (HTTP 200)
+PASS  TC4.5e  Borrower sets txHash on their own Draft                            expected DENY  got DENY  (HTTP 403)
+PASS  TC4.5f  Borrower edits their own application once it is 'Applied'          expected DENY  got DENY  (HTTP 403)
+PASS  TC4.5g  Broker creates an application                                      expected DENY  got DENY  (HTTP 403)
+PASS  TC4.6a  Unauthenticated user reads an application                          expected DENY  got DENY  (HTTP 403)
+PASS  TC4.6b  Unauthenticated user creates an application                        expected DENY  got DENY  (HTTP 403)
+PASS  TC4.7a  Borrower writes own profile with a 'role' field                    expected DENY  got DENY  (HTTP 403)
+PASS  TC4.7b  Borrower writes own profile without a 'role' field                 expected ALLOW got ALLOW (HTTP 200)
+PASS  TC4.7c  Borrower reads another user's profile                              expected DENY  got DENY  (HTTP 403)
+PASS  TC4.8a  Borrower reads auditRecords                                        expected DENY  got DENY  (HTTP 403)
+PASS  TC4.8b  Underwriter reads auditRecords                                     expected ALLOW got ALLOW (HTTP 404)
+
+22/22 checks passed
